@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FTP VIP Stalker</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<!-- Flatpickr (date-range picker) + html2canvas (PNG export) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/rangePlugin.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<!-- Google font for classy headings -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+
+<style>
+/* âââââ Design tokens âââââ */
+:root{
+  --black:#0e1216;           /* near-black */
+  --gold:#d4af37;            /* Fairmont-esque gold accent */
+  --surf:#ffffff;            /* card & form surface */
+  --bg:#f5f7fa;              /* app background */
+  --muted:#737b83;           /* muted text */
+  --gap:20px;
+  font-size:16px;
+  font-family:"Segoe UI",Calibri,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);padding:32px;color:var(--black); position: relative;}
+
+/* Entire scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+  background: #f1f1f1;
+  border-radius: 6px;
+}
+
+/* Scrollbar handle */
+::-webkit-scrollbar-thumb {
+  background: #d4af37; /* Gold */
+  border-radius: 6px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #b89c2b;
+}
+
+/* Track (the background) */
+::-webkit-scrollbar-track {
+  background: #faf9f6;
+}
+
+
+/* Headline */
+h1 {
+  font-family: "Playfair Display", serif;
+  font-size: clamp(2.5rem, 7vw, 4rem);
+  font-weight: 800;
+  margin-bottom: 0;
+  text-align: center;
+  letter-spacing: 0.03em;
+  color: #191919; /* Nearly black */
+  text-shadow:
+    0 6px 28px rgba(0,0,0,0.18),   /* strong black shadow */
+    0 1.5px 6px rgba(32,32,32,0.22), /* subtle glow */
+    0 0.5px 0px #d4af37;           /* subtle gold accent, almost invisible */
+  transition: letter-spacing 0.25s, text-shadow 0.25s;
+}
+
+h1 {
+  position: relative;
+}
+h1::after {
+  content: "";
+  display: block;
+  margin: 0 auto ;
+  width: 2.5em;
+  height: 0.14em;
+  background: linear-gradient(90deg, #222, #444 70%, #d4af37 100%);
+  border-radius: 1em;
+  opacity: 0.55;
+  margin-bottom: 4rem;
+}
+
+/* Flexible layout */
+.wrapper{display:flex;flex-wrap:wrap;gap:var(--gap)}
+
+/* âââââ Form âââââ */
+form{
+  flex:1 1 380px;min-width:320px;
+  background:var(--surf);padding:28px;border-radius:12px;
+  box-shadow:0 6px 18px rgba(0,0,0,.06);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25%;
+  max-height: 100vh;
+  overflow-y: scroll;
+}
+fieldset{border:none;margin-bottom:var(--gap)}
+legend{font-weight:700;margin-bottom:8px;font-size:1.05rem;color:var(--gold)}
+label{display:block;font-weight:600;margin-top:16px;font-size:.9rem}
+input[type=text],textarea{
+  width:100%;padding:12px;font-size:.9rem;border:1px solid #c9ced4;border-radius:8px;margin-top:6px;background:#fff
+}
+textarea{height:90px;resize:vertical}
+button{
+  cursor:pointer;border:none;border-radius:8px;padding:11px 22px;font-weight:600;font-size:.9rem;
+  transition:.25s background-color,.25s color;
+}
+button.main{background:var(--black);color:#fff}
+button.sec {background:#6b7280;color:#fff}
+button.warn{background:#b91c1c;color:#fff}
+button.small{padding:5px 12px;font-size:.75rem}
+button.main:hover{background:var(--gold);color:var(--black)}
+form .actions{display:flex;gap:12px;margin-top:var(--gap)}
+
+/* âââââ Photo boxes âââââ */
+#photoWrap{display:flex;flex-wrap:wrap;gap:16px;margin-top:10px}
+.box{position:relative;width:96px}
+.thumb{
+  width:96px;height:96px;border:2px dashed #a5a9ad;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:32px;color:#a5a9ad;
+  overflow:hidden;background:#fff;cursor:pointer;transition:.2s border-color;
+}
+.thumb:hover{border-color:var(--gold)}
+.thumb img{width:100%;height:100%;object-fit:cover}
+input.meta,input.reln{
+  width:100%;border:none;border-top:1px solid #d2d6da;padding:4px 2px;
+  font-size:.72rem;text-align:center;background:#fdfdfd
+}
+input.reln{font-size:.65rem}
+.remove{
+  position:absolute;top:-6px;right:-6px;background:#b91c1c;color:#fff;
+  width:20px;height:20px;border-radius:50%;font-size:12px;line-height:20px;text-align:center;cursor:pointer}
+
+/* âââââ Saved list âââââ */
+aside{flex:1 1 260px;min-width:240px; margin-left: 30%; padding: 1.2rem; box-shadow: 1rem 1rem 1rem rgba(0,0,0,.06);height: 70vh; overflow: auto; background-color: var(--surf); border-radius: .65rem;}
+aside h2{margin-bottom:12px;font-size:1.1rem;font-weight:700;color:var(--gold)}
+#savedList li{margin-bottom:10px;font-size:.85rem;color:var(--muted); list-style: none;}
+#savedList button{margin-left:8px}
+
+/* âââââ Preview card âââââ */
+#preview{flex:1 1 680px;min-width:320px}
+.card{
+  background:var(--surf);border:2px solid var(--black);border-radius:0;
+  box-shadow:0 8px 20px rgba(0,0,0,.08);overflow:hidden;
+}
+.card header{
+  background:var(--black);color:#fff;font-weight:700;padding:8px;text-align:center;font-size:1rem;
+  border-bottom:1px solid var(--gold)
+}
+.card .title{
+  /* background:linear-gradient(to right,var(--black),var(--black) 75%,var(--gold) 75%); */
+  background-color: #0e1216;
+  color:#fff;font-weight:700;padding:12px;text-align:center;font-size:1.8rem;
+  font-family:"Playfair Display",serif;text-transform:uppercase;letter-spacing:.5px
+}
+/* Photos heading */
+.sectionHead{
+  background:var(--bg);color:var(--gold);font-weight:700;padding:8px 12px;font-size:1.5rem;text-align: center;
+}
+.gallery{
+  display:flex;flex-wrap:wrap;gap:14px;justify-content:center;padding:16px;border-bottom:2px solid var(--gold)
+}
+.gallery figure{margin:0;text-align:center}
+.gallery img{width:96px;height:96px;object-fit:cover;border:2px solid #555;border-radius:6px}
+.gallery figcaption{font-size:.7rem;margin-top:4px;line-height:1.1}
+.card table{width:100%;border-collapse:collapse;font-size:.9rem}
+.card td:first-child{
+  background:#2f3338;color:#fff;font-weight:700;width:200px;padding:10px;vertical-align:top
+}
+.card td{border-top:1px solid #e0e3e6;padding:10px;vertical-align:top}
+@media(max-width:650px){.wrapper{flex-direction:column}}
+</style>
+</head>
+<body>
+<h1>FTP Stalker Generator</h1>
+
+<div class="wrapper">
+
+  <!-- âââââ Form âââââ -->
+  <form id="vipForm" autocomplete="off">
+    <fieldset>
+      <legend>Essential details</legend>
+      <label>Room number(s)</label>
+      <input id="room" type="text" required>
+
+      <label>Main guest name</label>
+      <input id="mainGuest" type="text" required>
+
+      <label>Title <span style="font-weight:400">Editable</span></label>
+      <input id="title" type="text">
+
+    </fieldset>
+
+    <fieldset>
+      <legend>Stay</legend>
+      <label>Dates</label>
+      <input id="stay" type="text" placeholder="Select stay range" required>
+    </fieldset>
+
+    <fieldset>
+      <legend>Preferences & remarks</legend>
+      <label>Guest profile</label><input id="guestProfile" type="text">
+      <label>Meal plan</label><input id="mealPlan" type="text" >
+      <label>HSKP preferences</label><input id="hskpPref" type="text" >
+      <label>Dining preferences</label><input id="diningPref" type="text" >
+      <label>Remarks</label><textarea id="remarks"></textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>Photos & relationships <span style="font-weight:400">(max 10)</span></legend>
+      <div id="photoWrap"></div>
+      <button type="button" class="small sec" id="addBox">+ Add guest slot</button>
+    </fieldset>
+
+    <div class="actions">
+      <button class="main" type="submit" id="saveBtn">Save card</button>
+      <button class="main" type="button" id="pngBtn">Generate PNG</button>
+      <button class="sec"  type="button" id="resetBtn">Reset</button>
+    </div>
+  </form>
+
+  <!-- âââââ Saved list âââââ -->
+  <aside>
+    <h2>Saved cards</h2>
+    <ul id="savedList"></ul>
+  </aside>
+
+  <!-- âââââ Live preview âââââ -->
+  <div id="preview"></div>
+</div>
+
+<script>
+/* âââââ Flatpickr âââââ */
+const fp=flatpickr("#stay",{mode:"range",dateFormat:"d M Y"});
+
+/* âââââ Utilities âââââ */
+const $=id=>document.getElementById(id);
+const wrap=$("photoWrap");
+let manualTitle=false, editId=null;
+
+/* Title binding */
+$("mainGuest").addEventListener('input',e=>{if(!manualTitle)$("title").value=e.target.value});
+$("title").addEventListener('input',()=>manualTitle=true);
+
+/* âââââ Photo box factory âââââ */
+function createBox(src='',name='',reln=''){
+  const box=document.createElement('div');box.className='box';
+
+  const thumb=document.createElement('div');thumb.className='thumb';thumb.textContent='+';
+  if(src){const im=new Image();im.src=src;thumb.innerHTML='';thumb.appendChild(im);}
+  box.appendChild(thumb);
+
+  const meta=document.createElement('input');meta.className='meta';meta.placeholder='Name';meta.value=name;
+  const rel=document.createElement('input');rel.className='reln';rel.placeholder='Relationship';rel.value=reln;
+  box.appendChild(meta);box.appendChild(rel);
+
+  const rm=document.createElement('span');rm.className='remove';rm.textContent='Ã';rm.onclick=()=>box.remove();
+  box.appendChild(rm);
+
+  /* paste */
+  thumb.addEventListener('paste',ev=>{
+    const it=[...ev.clipboardData.items].find(i=>i.type.startsWith('image/'));
+    if(it){const f=it.getAsFile(),r=new FileReader();
+      r.onload=e2=>{thumb.innerHTML='';const im=new Image();im.src=e2.target.result;thumb.appendChild(im);};
+      r.readAsDataURL(f);}ev.preventDefault();
+  });
+  /* click â upload */
+  thumb.addEventListener('click',()=>{
+    const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+    inp.onchange=ev=>{
+      const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+      r.onload=e2=>{thumb.innerHTML='';const im=new Image();im.src=e2.target.result;thumb.appendChild(im);};
+      r.readAsDataURL(f);
+    };inp.click();
+  });
+
+  wrap.appendChild(box);
+}
+$("addBox").onclick=()=>{if(wrap.children.length<10)createBox();};
+
+/* âââââ Storage helpers âââââ */
+const KEY='vipCards';
+const getCards=()=>JSON.parse(localStorage.getItem(KEY)||'[]');
+const setCards=arr=>localStorage.setItem(KEY,JSON.stringify(arr));
+
+/* âââââ Form submit âââââ */
+$("vipForm").onsubmit=e=>{
+  e.preventDefault();
+  const data=collect();
+  if(editId){data.id=editId;setCards(getCards().map(c=>c.id===editId?data:c));editId=null;}
+  else{data.id=Date.now();setCards([...getCards(),data]);}
+  clearForm();listCards();
+};
+
+/* Collect form data */
+function collect(){
+  const [start='',end='']=$("stay").value.split(' to ');
+  const photos=[...wrap.children].map(b=>({
+    src:b.querySelector('img')?b.querySelector('img').src:'',
+    name:b.querySelector('.meta').value.trim(),
+    reln:b.querySelector('.reln').value.trim()
+  }));
+  return{
+    room:$("room").value.trim(),
+    title:$("title").value.trim()||$("mainGuest").value.trim(),
+    main:$("mainGuest").value.trim(),
+    start,end,
+    gp:$("guestProfile").value.trim(),
+    mp:$("mealPlan").value.trim(),
+    hsk:$("hskpPref").value.trim(),
+    dp:$("diningPref").value.trim(),
+    remarks:$("remarks").value.trim().replace(/\n/g,'<br>'),
+    photos
+  };
+}
+
+/* Saved list */
+function listCards(){
+  const ul=$("savedList");ul.innerHTML='';
+  getCards().forEach(c=>{
+    const li=document.createElement('li');
+    li.innerHTML=`<strong>${c.title}</strong> â ${c.start||''}
+      <button class="small main" data-id="${c.id}" data-act="edit">Edit</button>
+      <button class="small warn" data-id="${c.id}" data-act="del">Delete</button>`;
+    ul.appendChild(li);
+  });
+}
+$("savedList").onclick=e=>{
+  const id=+e.target.dataset.id;if(!id)return;
+  if(e.target.dataset.act==='edit')loadForm(id);
+  if(e.target.dataset.act==='del'){
+    if(confirm('Delete this card?')){
+      setCards(getCards().filter(c=>c.id!==id));listCards();clearForm();
+    }
+  }
+};
+
+/* Load for editing */
+function loadForm(id){
+  const c=getCards().find(x=>x.id===id);if(!c)return;
+  editId=id;manualTitle=true;
+  $("room").value=c.room;$("title").value=c.title;$("mainGuest").value=c.main;
+  $("stay").value=c.start?`${c.start} to ${c.end}`:'';
+  fp.setDate([c.start,c.end]);
+  $("guestProfile").value=c.gp;$("mealPlan").value=c.mp;$("hskpPref").value=c.hsk;
+  $("diningPref").value=c.dp;$("remarks").value=c.remarks.replace(/<br>/g,'\n');
+  wrap.innerHTML='';c.photos.forEach(p=>createBox(p.src,p.name,p.reln));
+  renderPreview(c);
+}
+
+/* Reset */
+function clearForm(){
+  $("vipForm").reset();fp.clear();manualTitle=false;wrap.innerHTML='';createBox();
+  $("preview").innerHTML='';editId=null;
+}
+$("resetBtn").onclick=clearForm;
+
+/* Preview */
+function renderPreview(c){
+  const accompany=c.photos.slice(1).length
+        ?c.photos.slice(1).map(p=>`${p.name}${p.reln?` (${p.reln})`:''}`).join(', ')
+        :'N/A';
+  $("preview").innerHTML=`
+  <div class="card" id="cardRender">
+    <header>Room ${c.room}</header>
+    <div class="title">${c.title}</div>
+    <div class="sectionHead">${c.gp||'N/A'}</div>
+    <div class="gallery">
+      ${c.photos.map(p=>`
+        <figure>
+          ${p.src?`<img src="${p.src}">`:'<img src="" style="opacity:.2">'}
+          <figcaption>${p.name}</figcaption>
+        </figure>`).join('')}
+    </div>
+    <table>
+      <tr><td>Stay Dates</td><td>${c.start} - ${c.end}</td></tr>
+      <tr><td>Accompany Guest</td><td>${accompany}</td></tr>
+      <tr><td>Meal Plan</td><td>${c.mp||'N/A'}</td></tr>
+      <tr><td>HSK Preferences</td><td>${c.hsk||'N/A'}</td></tr>
+      <tr><td>Dining Preferences</td><td>${c.dp||'N/A'}</td></tr>
+      <tr><td>Remarks</td><td>${c.remarks||'N/A'}</td></tr>
+    </table>
+  </div>`;
+}
+
+/* Live preview as you type */
+document.addEventListener('input',()=>{if($("mainGuest").value)renderPreview(collect());});
+
+/* PNG exporter */
+$("pngBtn").onclick=()=>{
+  const data=collect();renderPreview(data);
+  html2canvas($("cardRender"),{scale:2}).then(cv=>{
+    cv.toBlob(b=>{
+      const link=document.createElement('a');
+      link.href=URL.createObjectURL(b);
+      link.download=`VIP_${data.title.replace(/\s+/g,'_')}.png`;
+      link.click();
+    });
+  });
+};
+
+/* Boot */
+window.addEventListener('load',()=>{
+  listCards();createBox();   /* first slot for main guest */
+});
+</script>
+</body>
+</html>
