@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {emptyCard,type GuestCard} from '../src/lib/schema';
+import {hasChanges,readDrafts,type SavedDraft} from '../src/lib/drafts';
+const original:GuestCard={...emptyCard,id:'abc',main:'Original guest',actor:'Creator',createdBy:'Creator',updatedBy:'Creator',createdAt:'2026-10-18',updatedAt:'2026-10-18',revision:3};
+const unfinished:SavedDraft={key:'new',data:{...emptyCard,remarks:'Unfinished notes\nSecond line',photos:[{src:'https://res.cloudinary.com/test/image/upload/example.jpg',name:'Guest',reln:'Partner'}]},original:null,manualTitle:true,savedAt:'2026-10-18T10:00:00Z'};
+test('blank cards and unchanged edits do not need confirmation',()=>{assert.equal(hasChanges(emptyCard,null),false);assert.equal(hasChanges({...original,actor:''},original),false);assert.equal(hasChanges({...original,actor:'Editor'},original),true);assert.equal(hasChanges({...emptyCard,remarks:'Notes'},null),true);});
+test('partial drafts survive serialization with photographs and manual title mode',()=>{const result=readDrafts(JSON.stringify({new:unfinished}));assert.deepEqual(result.new,unfinished);});
+test('new cards and edits retain separate recovery entries with their original revision',()=>{const edit:SavedDraft={...unfinished,key:'abc',original,data:{...original,actor:'Editor',main:'Edited guest'}};const result=readDrafts(JSON.stringify({new:unfinished,abc:edit}));assert.equal(Object.keys(result).length,2);assert.equal(result.abc.original?.revision,3);assert.equal(hasChanges(result.abc.data,result.abc.original),true);});
+test('corrupt or unsafe recovery data is ignored',()=>{assert.deepEqual(readDrafts('{bad json'),{});assert.deepEqual(readDrafts(JSON.stringify({new:{...unfinished,data:{...unfinished.data,photos:[{src:'javascript:bad',name:'',reln:''}]}}})),{});assert.deepEqual(readDrafts(JSON.stringify({abc:{...unfinished,key:'abc',original:null}})),{});});
